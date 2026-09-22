@@ -1,0 +1,47 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<h1>Übersicht</h1>
+
+<div class="card">
+  <h2>Stunden diese Woche (seit {{ week_start }})</h2>
+  {% if hours_by_employee %}
+  <table class="table">
+    <thead><tr><th>Mitarbeiter</th><th>Stunden</th></tr></thead>
+    <tbody>
+      {% for name, hours in hours_by_employee.items() %}
+      <tr><td>{{ name }}</td><td>{{ hours }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Diese Woche wurden noch keine Zeiten erfasst.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Offene Aufgaben ({{ open_tasks|length }})</h2>
+  {% if open_tasks %}
+  <table class="table">
+    <thead><tr><th>Titel</th><th>Mitarbeiter</th><th>Zeitraum</th></tr></thead>
+    <tbody>
+      {% for t in open_tasks %}
+      <tr>
+        <td>{{ t.title }}</td>
+        <td>{{ t.employee_name or 'Alle' }}</td>
+        <td>{{ t.start_date }} – {{ t.end_date }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Keine offenen Aufgaben.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Aktive Mitarbeiter ({{ employees|length }})</h2>
+  <ul>
+    {% for e in employees %}<li>{{ e.name }}</li>{% endfor %}
+  </ul>
+</div>
+{% endblock %}

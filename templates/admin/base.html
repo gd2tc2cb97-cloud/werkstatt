@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+{% if session.get('admin_id') %}
+<nav class="admin-nav">
+  <a href="{{ url_for('admin.dashboard') }}">Übersicht</a>
+  <a href="{{ url_for('admin.employees') }}">Mitarbeiter</a>
+  <a href="{{ url_for('admin.tasks') }}">Aufgaben</a>
+  <a href="{{ url_for('admin.entries') }}">Zeiten / Drucken</a>
+  <a href="{{ url_for('admin.settings') }}">Einstellungen</a>
+  <a href="{{ url_for('admin.logout') }}">Abmelden</a>
+</nav>
+{% endif %}
+{% block admin_content %}{% endblock %}
+{% endblock %}

@@ -1,0 +1,4 @@
+flask>=3.0
+python-dotenv>=1.0
+# Für den Live-Betrieb statt des Flask-Entwicklungsservers:
+# gunicorn>=22

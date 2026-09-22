@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<h1>{{ 'Mitarbeiter bearbeiten' if employee else 'Neuer Mitarbeiter' }}</h1>
+<div class="card card-narrow">
+  <form method="post">
+    <label>Name
+      <input type="text" name="name" value="{{ employee.name if employee else '' }}" required autofocus>
+    </label>
+    <label>{{ 'Neue PIN (leer lassen, um nicht zu ändern)' if employee else 'PIN' }}
+      <input type="text" name="pin" inputmode="numeric" autocomplete="off" {{ 'required' if not employee else '' }}>
+    </label>
+    {% if employee %}
+    <label class="checkbox">
+      <input type="checkbox" name="active" {{ 'checked' if employee.active else '' }}>
+      Aktiv (kann sich einloggen)
+    </label>
+    {% endif %}
+    <div class="row">
+      <button type="submit">Speichern</button>
+      <a class="button secondary" href="{{ url_for('admin.employees') }}">Abbrechen</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

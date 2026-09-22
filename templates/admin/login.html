@@ -1,0 +1,16 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="card card-narrow">
+  <h1>Admin-Login</h1>
+  <form method="post">
+    <label>Benutzername
+      <input type="text" name="username" required autofocus>
+    </label>
+    <label>Passwort
+      <input type="password" name="password" required>
+    </label>
+    <button type="submit">Anmelden</button>
+  </form>
+  <p class="muted"><a href="{{ url_for('login') }}">Zum Mitarbeiter-Login</a></p>
+</div>
+{% endblock %}
