@@ -1,0 +1,67 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+<div class="no-print">
+  <h1>Zeiten</h1>
+  <div class="card">
+    <form method="get" class="row filter-form">
+      <label>Mitarbeiter
+        <select name="employee_id">
+          <option value="">– Alle –</option>
+          {% for e in employees %}
+            <option value="{{ e.id }}" {{ 'selected' if selected_employee_id == e.id|string else '' }}>{{ e.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Von
+        <input type="date" name="date_from" value="{{ date_from or '' }}">
+      </label>
+      <label>Bis
+        <input type="date" name="date_to" value="{{ date_to or '' }}">
+      </label>
+      <button type="submit">Filtern</button>
+      <button type="button" onclick="window.print()">Drucken</button>
+    </form>
+  </div>
+</div>
+
+<div class="print-header">
+  <h1>{{ settings.company_name }} – Zeiterfassung</h1>
+  <p>
+    {% if date_from or date_to %}Zeitraum: {{ date_from or '…' }} bis {{ date_to or '…' }}{% endif %}
+  </p>
+</div>
+
+<div class="card">
+  <table class="table">
+    <thead>
+      <tr><th>Datum</th><th>Mitarbeiter</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Stunden</th><th>Aufgabe</th><th>Notiz</th></tr>
+    </thead>
+    <tbody>
+      {% for item in entries %}
+      <tr>
+        <td>{{ item.row.entry_date }}</td>
+        <td>{{ item.row.employee_name }}</td>
+        <td>{{ item.row.start_time }}</td>
+        <td>{{ item.row.end_time }}</td>
+        <td>{{ item.row.break_minutes }} min</td>
+        <td>{{ item.hours }}</td>
+        <td>{{ item.row.task_title or '' }}</td>
+        <td>{{ item.row.notes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not entries %}<p class="muted">Keine Einträge für diesen Filter.</p>{% endif %}
+
+  <h2>Summe je Mitarbeiter</h2>
+  <table class="table">
+    <thead><tr><th>Mitarbeiter</th><th>Stunden</th></tr></thead>
+    <tbody>
+      {% for name, hours in sums_by_employee.items() %}
+      <tr><td>{{ name }}</td><td>{{ hours }}</td></tr>
+      {% endfor %}
+      <tr><td><strong>Gesamt</strong></td><td><strong>{{ total_hours }}</strong></td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
