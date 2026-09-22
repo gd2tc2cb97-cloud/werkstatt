@@ -1,4 +1,4 @@
-"""Datenbank: Mitarbeiter, Zeiteinträge, Aufgaben, Admins, Einstellungen."""
+"""Datenbank: Mitarbeiter, Tagesarbeitszeiten, Aufgabenzeiten, Aufgaben, Admins, Einstellungen."""
 
 import sqlite3
 from pathlib import Path
@@ -57,32 +57,51 @@ def init_db(admin_username=None, admin_password=None):
             password_hash TEXT NOT NULL
         );
 
+        -- Aufgabe: z.B. "Bremsen prüfen" für ein bestimmtes Fahrzeug (Kennzeichen),
+        -- optional einem Mitarbeiter zugewiesen, mit vorgegebenem Zeitraum.
         CREATE TABLE IF NOT EXISTS tasks (
-            id          INTEGER PRIMARY KEY,
-            title       TEXT NOT NULL,
-            description TEXT NOT NULL DEFAULT '',
-            employee_id INTEGER REFERENCES employees(id),
-            start_date  TEXT NOT NULL,
-            end_date    TEXT NOT NULL,
-            status      TEXT NOT NULL DEFAULT 'offen',
-            created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            id             INTEGER PRIMARY KEY,
+            title          TEXT NOT NULL,
+            description    TEXT NOT NULL DEFAULT '',
+            license_plate  TEXT NOT NULL DEFAULT '',
+            employee_id    INTEGER REFERENCES employees(id),
+            start_date     TEXT NOT NULL,
+            end_date       TEXT NOT NULL,
+            status         TEXT NOT NULL DEFAULT 'offen',
+            created_at     TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS time_entries (
+        -- Tagesarbeitszeit: Kommen/Gehen/Pause, ein Eintrag pro Mitarbeiter und Tag.
+        CREATE TABLE IF NOT EXISTS day_entries (
             id            INTEGER PRIMARY KEY,
             employee_id   INTEGER NOT NULL REFERENCES employees(id),
             entry_date    TEXT NOT NULL,
             start_time    TEXT NOT NULL,
             end_time      TEXT NOT NULL,
             break_minutes INTEGER NOT NULL DEFAULT 0,
-            task_id       INTEGER REFERENCES tasks(id),
-            notes         TEXT NOT NULL DEFAULT '',
             created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+            updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(employee_id, entry_date)
         );
 
-        CREATE INDEX IF NOT EXISTS idx_entries_employee_date
-            ON time_entries(employee_id, entry_date);
+        -- Aufgabenzeit: einzelne Zeitblöcke, die einer Aufgabe zugeordnet sind
+        -- (mehrere pro Tag möglich).
+        CREATE TABLE IF NOT EXISTS task_entries (
+            id          INTEGER PRIMARY KEY,
+            employee_id INTEGER NOT NULL REFERENCES employees(id),
+            entry_date  TEXT NOT NULL,
+            task_id     INTEGER REFERENCES tasks(id),
+            start_time  TEXT NOT NULL,
+            end_time    TEXT NOT NULL,
+            notes       TEXT NOT NULL DEFAULT '',
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_day_entries_employee_date
+            ON day_entries(employee_id, entry_date);
+        CREATE INDEX IF NOT EXISTS idx_task_entries_employee_date
+            ON task_entries(employee_id, entry_date);
         CREATE INDEX IF NOT EXISTS idx_tasks_employee
             ON tasks(employee_id, start_date, end_date);
     """)
@@ -189,19 +208,19 @@ def get_task(db, task_id):
     return db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
 
 
-def create_task(db, title, description, employee_id, start_date, end_date):
+def create_task(db, title, description, license_plate, employee_id, start_date, end_date):
     db.execute(
-        "INSERT INTO tasks (title, description, employee_id, start_date, end_date) "
-        "VALUES (?, ?, ?, ?, ?)",
-        (title, description, employee_id, start_date, end_date),
+        "INSERT INTO tasks (title, description, license_plate, employee_id, start_date, end_date) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (title, description, license_plate, employee_id, start_date, end_date),
     )
 
 
-def update_task(db, task_id, title, description, employee_id, start_date, end_date, status):
+def update_task(db, task_id, title, description, license_plate, employee_id, start_date, end_date, status):
     db.execute(
-        "UPDATE tasks SET title = ?, description = ?, employee_id = ?, "
+        "UPDATE tasks SET title = ?, description = ?, license_plate = ?, employee_id = ?, "
         "start_date = ?, end_date = ?, status = ? WHERE id = ?",
-        (title, description, employee_id, start_date, end_date, status, task_id),
+        (title, description, license_plate, employee_id, start_date, end_date, status, task_id),
     )
 
 
@@ -209,10 +228,23 @@ def delete_task(db, task_id):
     db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
 
 
-# ---------- Time entries ----------
+# ---------- Tagesarbeitszeit (day_entries) ----------
 
-def list_entries_for_employee(db, employee_id, date_from=None, date_to=None):
-    sql = "SELECT * FROM time_entries WHERE employee_id = ?"
+def get_day_entry(db, employee_id, entry_date):
+    return db.execute(
+        "SELECT * FROM day_entries WHERE employee_id = ? AND entry_date = ?",
+        (employee_id, entry_date),
+    ).fetchone()
+
+
+def get_day_entry_by_id(db, day_entry_id):
+    return db.execute(
+        "SELECT * FROM day_entries WHERE id = ?", (day_entry_id,)
+    ).fetchone()
+
+
+def list_day_entries_for_employee(db, employee_id, date_from=None, date_to=None):
+    sql = "SELECT * FROM day_entries WHERE employee_id = ?"
     params = [employee_id]
     if date_from:
         sql += " AND entry_date >= ?"
@@ -220,58 +252,111 @@ def list_entries_for_employee(db, employee_id, date_from=None, date_to=None):
     if date_to:
         sql += " AND entry_date <= ?"
         params.append(date_to)
-    sql += " ORDER BY entry_date DESC, start_time DESC"
+    sql += " ORDER BY entry_date DESC"
     return db.execute(sql, params).fetchall()
 
 
-def list_entries(db, employee_id=None, date_from=None, date_to=None):
+def list_day_entries(db, employee_id=None, date_from=None, date_to=None):
     sql = (
-        "SELECT time_entries.*, employees.name AS employee_name, tasks.title AS task_title "
-        "FROM time_entries "
-        "JOIN employees ON employees.id = time_entries.employee_id "
-        "LEFT JOIN tasks ON tasks.id = time_entries.task_id "
+        "SELECT day_entries.*, employees.name AS employee_name "
+        "FROM day_entries JOIN employees ON employees.id = day_entries.employee_id "
         "WHERE 1=1"
     )
     params = []
     if employee_id:
-        sql += " AND time_entries.employee_id = ?"
+        sql += " AND day_entries.employee_id = ?"
         params.append(employee_id)
     if date_from:
-        sql += " AND time_entries.entry_date >= ?"
+        sql += " AND day_entries.entry_date >= ?"
         params.append(date_from)
     if date_to:
-        sql += " AND time_entries.entry_date <= ?"
+        sql += " AND day_entries.entry_date <= ?"
         params.append(date_to)
-    sql += " ORDER BY time_entries.entry_date, employees.name COLLATE NOCASE, time_entries.start_time"
+    sql += " ORDER BY day_entries.entry_date, employees.name COLLATE NOCASE"
     return db.execute(sql, params).fetchall()
 
 
-def get_entry(db, entry_id):
+def upsert_day_entry(db, employee_id, entry_date, start_time, end_time, break_minutes):
+    db.execute(
+        "INSERT INTO day_entries (employee_id, entry_date, start_time, end_time, break_minutes) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(employee_id, entry_date) DO UPDATE SET "
+        "start_time = excluded.start_time, end_time = excluded.end_time, "
+        "break_minutes = excluded.break_minutes, updated_at = datetime('now')",
+        (employee_id, entry_date, start_time, end_time, break_minutes),
+    )
+
+
+def delete_day_entry(db, day_entry_id):
+    db.execute("DELETE FROM day_entries WHERE id = ?", (day_entry_id,))
+
+
+# ---------- Aufgabenzeiten (task_entries) ----------
+
+def list_task_entries_for_employee(db, employee_id, date_from=None, date_to=None):
+    sql = (
+        "SELECT task_entries.*, tasks.title AS task_title, tasks.license_plate AS task_license_plate "
+        "FROM task_entries LEFT JOIN tasks ON tasks.id = task_entries.task_id "
+        "WHERE task_entries.employee_id = ?"
+    )
+    params = [employee_id]
+    if date_from:
+        sql += " AND task_entries.entry_date >= ?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND task_entries.entry_date <= ?"
+        params.append(date_to)
+    sql += " ORDER BY task_entries.entry_date DESC, task_entries.start_time DESC"
+    return db.execute(sql, params).fetchall()
+
+
+def list_task_entries(db, employee_id=None, date_from=None, date_to=None):
+    sql = (
+        "SELECT task_entries.*, employees.name AS employee_name, "
+        "tasks.title AS task_title, tasks.license_plate AS task_license_plate "
+        "FROM task_entries "
+        "JOIN employees ON employees.id = task_entries.employee_id "
+        "LEFT JOIN tasks ON tasks.id = task_entries.task_id "
+        "WHERE 1=1"
+    )
+    params = []
+    if employee_id:
+        sql += " AND task_entries.employee_id = ?"
+        params.append(employee_id)
+    if date_from:
+        sql += " AND task_entries.entry_date >= ?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND task_entries.entry_date <= ?"
+        params.append(date_to)
+    sql += " ORDER BY task_entries.entry_date, employees.name COLLATE NOCASE, task_entries.start_time"
+    return db.execute(sql, params).fetchall()
+
+
+def get_task_entry(db, entry_id):
     return db.execute(
-        "SELECT * FROM time_entries WHERE id = ?", (entry_id,)
+        "SELECT * FROM task_entries WHERE id = ?", (entry_id,)
     ).fetchone()
 
 
-def create_entry(db, employee_id, entry_date, start_time, end_time, break_minutes, task_id, notes):
+def create_task_entry(db, employee_id, entry_date, task_id, start_time, end_time, notes):
     db.execute(
-        "INSERT INTO time_entries "
-        "(employee_id, entry_date, start_time, end_time, break_minutes, task_id, notes) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (employee_id, entry_date, start_time, end_time, break_minutes, task_id, notes),
+        "INSERT INTO task_entries (employee_id, entry_date, task_id, start_time, end_time, notes) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (employee_id, entry_date, task_id, start_time, end_time, notes),
     )
 
 
-def update_entry(db, entry_id, entry_date, start_time, end_time, break_minutes, task_id, notes):
+def update_task_entry(db, entry_id, entry_date, task_id, start_time, end_time, notes):
     db.execute(
-        "UPDATE time_entries SET entry_date = ?, start_time = ?, end_time = ?, "
-        "break_minutes = ?, task_id = ?, notes = ?, updated_at = datetime('now') "
-        "WHERE id = ?",
-        (entry_date, start_time, end_time, break_minutes, task_id, notes, entry_id),
+        "UPDATE task_entries SET entry_date = ?, task_id = ?, start_time = ?, end_time = ?, "
+        "notes = ?, updated_at = datetime('now') WHERE id = ?",
+        (entry_date, task_id, start_time, end_time, notes, entry_id),
     )
 
 
-def delete_entry(db, entry_id):
-    db.execute("DELETE FROM time_entries WHERE id = ?", (entry_id,))
+def delete_task_entry(db, entry_id):
+    db.execute("DELETE FROM task_entries WHERE id = ?", (entry_id,))
 
 
 # ---------- Admins ----------

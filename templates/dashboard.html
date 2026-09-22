@@ -13,6 +13,7 @@
     {% for t in tasks %}
       <li>
         <strong>{{ t.title }}</strong>
+        {% if t.license_plate %}<span class="plate">{{ t.license_plate }}</span>{% endif %}
         <span class="muted">({{ t.start_date }} – {{ t.end_date }})</span>
         {% if t.description %}<div class="muted">{{ t.description }}</div>{% endif %}
       </li>
@@ -21,76 +22,131 @@
 </div>
 {% endif %}
 
-<div class="card" id="entry-form-card">
-  <h2 id="form-title">Neuer Eintrag</h2>
-  <form method="post" action="{{ url_for('save_entry') }}" id="entry-form">
-    <input type="hidden" name="entry_id" id="entry_id" value="">
-
-    <label>Datum
-      <input type="date" name="entry_date" id="entry_date"
-             min="{{ range_start.isoformat() }}" max="{{ range_end.isoformat() }}"
-             value="{{ today.isoformat() }}" required>
-    </label>
-
+<!-- Tagesarbeitszeit -->
+<div class="card" id="day-form-card">
+  <h2 id="day-form-title">Tagesarbeitszeit</h2>
+  <p class="muted">Kommen, Gehen und Pause – einmal pro Tag.</p>
+  <form method="post" action="{{ url_for('save_day_entry') }}" id="day-form">
     <div class="row">
+      <label>Datum
+        <input type="date" name="entry_date" id="day_entry_date"
+               min="{{ range_start.isoformat() }}" max="{{ range_end.isoformat() }}"
+               value="{{ today.isoformat() }}" required>
+      </label>
       <label>Beginn
-        <input type="time" name="start_time" id="start_time" required>
+        <input type="time" name="start_time" id="day_start_time" required>
       </label>
       <label>Ende
-        <input type="time" name="end_time" id="end_time" required>
+        <input type="time" name="end_time" id="day_end_time" required>
       </label>
       <label>Pause (Minuten)
-        <input type="number" name="break_minutes" id="break_minutes" min="0" step="5" value="0">
+        <input type="number" name="break_minutes" id="day_break_minutes" min="0" step="5" value="0">
       </label>
     </div>
-
-    {% if tasks %}
-    <label>Zugehörige Aufgabe (optional)
-      <select name="task_id" id="task_id">
-        <option value="">– keine –</option>
-        {% for t in tasks %}
-          <option value="{{ t.id }}">{{ t.title }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
-
-    <label>Was wurde erledigt?
-      <textarea name="notes" id="notes" rows="3" required></textarea>
-    </label>
-
-    <div class="row">
-      <button type="submit">Speichern</button>
-      <button type="button" class="secondary" id="cancel-edit" style="display:none">Abbrechen</button>
-    </div>
+    <button type="submit">Tagesarbeitszeit speichern</button>
   </form>
 </div>
 
 <div class="card">
-  <h2>Deine Einträge (bearbeitbar)</h2>
-  {% if entries %}
+  <h2>Deine Tage (bearbeitbar)</h2>
+  {% if day_entries %}
   <table class="table">
-    <thead>
-      <tr><th>Datum</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Aufgabe</th><th></th></tr>
-    </thead>
+    <thead><tr><th>Datum</th><th>Beginn</th><th>Ende</th><th>Pause</th><th></th></tr></thead>
     <tbody>
-      {% for e in entries %}
+      {% for e in day_entries %}
       <tr>
         <td>{{ e.entry_date }}</td>
         <td>{{ e.start_time }}</td>
         <td>{{ e.end_time }}</td>
         <td>{{ e.break_minutes }} min</td>
+        <td class="actions">
+          <button type="button" class="link day-edit-btn"
+            data-date="{{ e.entry_date }}" data-start="{{ e.start_time }}"
+            data-end="{{ e.end_time }}" data-break="{{ e.break_minutes }}">Bearbeiten</button>
+          <form method="post" action="{{ url_for('delete_day_entry', day_entry_id=e.id) }}" class="inline"
+                onsubmit="return confirm('Tag wirklich löschen?')">
+            <button type="submit" class="link danger">Löschen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Noch keine Tage in diesem Zeitraum erfasst.</p>
+  {% endif %}
+</div>
+
+<!-- Aufgabenzeiten -->
+<div class="card" id="task-form-card">
+  <h2 id="task-form-title">Zeit zu einer Aufgabe</h2>
+  <p class="muted">Für jede Aufgabe/jedes Fahrzeug einen eigenen Zeitblock – mehrere pro Tag möglich.</p>
+  <form method="post" action="{{ url_for('save_task_entry') }}" id="task-form">
+    <input type="hidden" name="entry_id" id="task_entry_id" value="">
+
+    <label>Datum
+      <input type="date" name="entry_date" id="task_entry_date"
+             min="{{ range_start.isoformat() }}" max="{{ range_end.isoformat() }}"
+             value="{{ today.isoformat() }}" required>
+    </label>
+
+    {% if tasks %}
+    <label>Aufgabe
+      <select name="task_id" id="task_task_id">
+        <option value="">– Sonstiges –</option>
+        {% for t in tasks %}
+          <option value="{{ t.id }}">{{ t.title }}{% if t.license_plate %} ({{ t.license_plate }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+
+    <div class="row">
+      <label>Beginn
+        <input type="time" name="start_time" id="task_start_time" required>
+      </label>
+      <label>Ende
+        <input type="time" name="end_time" id="task_end_time" required>
+      </label>
+    </div>
+
+    <label>Was wurde erledigt?
+      <textarea name="notes" id="task_notes" rows="3" required></textarea>
+    </label>
+
+    <div class="row">
+      <button type="submit">Speichern</button>
+      <button type="button" class="secondary" id="task-cancel-edit" style="display:none">Abbrechen</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Deine Aufgabenzeiten (bearbeitbar)</h2>
+  {% if task_entries %}
+  <table class="table">
+    <thead>
+      <tr><th>Datum</th><th>Beginn</th><th>Ende</th><th>Aufgabe</th><th>Notiz</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for e in task_entries %}
+      <tr>
+        <td>{{ e.entry_date }}</td>
+        <td>{{ e.start_time }}</td>
+        <td>{{ e.end_time }}</td>
+        <td>
+          {% if e.task_title %}{{ e.task_title }}{% if e.task_license_plate %} <span class="plate">{{ e.task_license_plate }}</span>{% endif %}{% else %}<span class="muted">– Sonstiges –</span>{% endif %}
+        </td>
         <td>{{ e.notes }}</td>
         <td class="actions">
-          <button type="button" class="link edit-btn"
+          <button type="button" class="link task-edit-btn"
             data-id="{{ e.id }}"
             data-date="{{ e.entry_date }}"
             data-start="{{ e.start_time }}"
             data-end="{{ e.end_time }}"
-            data-break="{{ e.break_minutes }}"
             data-task="{{ e.task_id or '' }}"
             data-notes="{{ e.notes }}">Bearbeiten</button>
-          <form method="post" action="{{ url_for('delete_entry', entry_id=e.id) }}" class="inline"
+          <form method="post" action="{{ url_for('delete_task_entry', entry_id=e.id) }}" class="inline"
                 onsubmit="return confirm('Eintrag wirklich löschen?')">
             <button type="submit" class="link danger">Löschen</button>
           </form>
@@ -100,20 +156,20 @@
     </tbody>
   </table>
   {% else %}
-  <p class="muted">Noch keine Einträge in diesem Zeitraum.</p>
+  <p class="muted">Noch keine Aufgabenzeiten in diesem Zeitraum.</p>
   {% endif %}
 </div>
 
-{% if history %}
+{% if day_history %}
 <div class="card">
-  <h2>Frühere Einträge (nur Ansicht)</h2>
+  <h2>Frühere Tage (nur Ansicht)</h2>
   <table class="table">
-    <thead><tr><th>Datum</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Notiz</th></tr></thead>
+    <thead><tr><th>Datum</th><th>Beginn</th><th>Ende</th><th>Pause</th></tr></thead>
     <tbody>
-      {% for e in history %}
+      {% for e in day_history %}
       <tr>
         <td>{{ e.entry_date }}</td><td>{{ e.start_time }}</td><td>{{ e.end_time }}</td>
-        <td>{{ e.break_minutes }} min</td><td>{{ e.notes }}</td>
+        <td>{{ e.break_minutes }} min</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -122,26 +178,36 @@
 {% endif %}
 
 <script>
-document.querySelectorAll('.edit-btn').forEach(function (btn) {
+document.querySelectorAll('.day-edit-btn').forEach(function (btn) {
   btn.addEventListener('click', function () {
-    document.getElementById('entry_id').value = btn.dataset.id;
-    document.getElementById('entry_date').value = btn.dataset.date;
-    document.getElementById('start_time').value = btn.dataset.start;
-    document.getElementById('end_time').value = btn.dataset.end;
-    document.getElementById('break_minutes').value = btn.dataset.break;
-    if (document.getElementById('task_id')) {
-      document.getElementById('task_id').value = btn.dataset.task;
-    }
-    document.getElementById('notes').value = btn.dataset.notes;
-    document.getElementById('form-title').textContent = 'Eintrag bearbeiten';
-    document.getElementById('cancel-edit').style.display = '';
-    document.getElementById('entry-form-card').scrollIntoView({behavior: 'smooth'});
+    document.getElementById('day_entry_date').value = btn.dataset.date;
+    document.getElementById('day_start_time').value = btn.dataset.start;
+    document.getElementById('day_end_time').value = btn.dataset.end;
+    document.getElementById('day_break_minutes').value = btn.dataset.break;
+    document.getElementById('day-form-title').textContent = 'Tagesarbeitszeit bearbeiten';
+    document.getElementById('day-form-card').scrollIntoView({behavior: 'smooth'});
   });
 });
-document.getElementById('cancel-edit').addEventListener('click', function () {
-  document.getElementById('entry-form').reset();
-  document.getElementById('entry_id').value = '';
-  document.getElementById('form-title').textContent = 'Neuer Eintrag';
+
+document.querySelectorAll('.task-edit-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    document.getElementById('task_entry_id').value = btn.dataset.id;
+    document.getElementById('task_entry_date').value = btn.dataset.date;
+    document.getElementById('task_start_time').value = btn.dataset.start;
+    document.getElementById('task_end_time').value = btn.dataset.end;
+    if (document.getElementById('task_task_id')) {
+      document.getElementById('task_task_id').value = btn.dataset.task;
+    }
+    document.getElementById('task_notes').value = btn.dataset.notes;
+    document.getElementById('task-form-title').textContent = 'Aufgabenzeit bearbeiten';
+    document.getElementById('task-cancel-edit').style.display = '';
+    document.getElementById('task-form-card').scrollIntoView({behavior: 'smooth'});
+  });
+});
+document.getElementById('task-cancel-edit').addEventListener('click', function () {
+  document.getElementById('task-form').reset();
+  document.getElementById('task_entry_id').value = '';
+  document.getElementById('task-form-title').textContent = 'Zeit zu einer Aufgabe';
   this.style.display = 'none';
 });
 </script>

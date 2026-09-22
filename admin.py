@@ -50,10 +50,10 @@ def dashboard():
     employees = db.list_employees(dbc, active_only=True)
 
     week_start = (date.today() - timedelta(days=date.today().weekday())).isoformat()
-    week_entries = db.list_entries(dbc, date_from=week_start)
+    week_day_entries = db.list_day_entries(dbc, date_from=week_start)
 
     hours_by_employee = {}
-    for e in week_entries:
+    for e in week_day_entries:
         minutes = util.compute_minutes(e["start_time"], e["end_time"], e["break_minutes"])
         hours_by_employee[e["employee_name"]] = hours_by_employee.get(e["employee_name"], 0) + minutes
 
@@ -140,6 +140,7 @@ def task_new():
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
+        license_plate = request.form.get("license_plate", "").strip()
         employee_id = request.form.get("employee_id") or None
         start_date = request.form.get("start_date", "")
         end_date = request.form.get("end_date", "")
@@ -149,7 +150,7 @@ def task_new():
         elif end_date < start_date:
             flash("Das Enddatum darf nicht vor dem Startdatum liegen.", "error")
         else:
-            db.create_task(dbc, title, description, employee_id, start_date, end_date)
+            db.create_task(dbc, title, description, license_plate, employee_id, start_date, end_date)
             flash("Aufgabe angelegt.", "success")
             return redirect(url_for("admin.tasks"))
 
@@ -171,6 +172,7 @@ def task_edit(task_id):
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
+        license_plate = request.form.get("license_plate", "").strip()
         employee_id = request.form.get("employee_id") or None
         start_date = request.form.get("start_date", "")
         end_date = request.form.get("end_date", "")
@@ -181,7 +183,7 @@ def task_edit(task_id):
         elif end_date < start_date:
             flash("Das Enddatum darf nicht vor dem Startdatum liegen.", "error")
         else:
-            db.update_task(dbc, task_id, title, description, employee_id, start_date, end_date, status)
+            db.update_task(dbc, task_id, title, description, license_plate, employee_id, start_date, end_date, status)
             flash("Aufgabe aktualisiert.", "success")
             return redirect(url_for("admin.tasks"))
 
@@ -210,20 +212,27 @@ def entries():
     date_from = request.args.get("date_from") or None
     date_to = request.args.get("date_to") or None
 
-    rows = db.list_entries(dbc, employee_id=employee_id, date_from=date_from, date_to=date_to)
+    day_rows = db.list_day_entries(dbc, employee_id=employee_id, date_from=date_from, date_to=date_to)
+    task_rows = db.list_task_entries(dbc, employee_id=employee_id, date_from=date_from, date_to=date_to)
 
     total_minutes = 0
     sums_by_employee = {}
-    entries_view = []
-    for r in rows:
+    day_view = []
+    for r in day_rows:
         minutes = util.compute_minutes(r["start_time"], r["end_time"], r["break_minutes"])
         total_minutes += minutes
         sums_by_employee[r["employee_name"]] = sums_by_employee.get(r["employee_name"], 0) + minutes
-        entries_view.append({"row": r, "hours": util.format_hours(minutes)})
+        day_view.append({"row": r, "hours": util.format_hours(minutes)})
+
+    task_view = []
+    for r in task_rows:
+        minutes = util.compute_minutes(r["start_time"], r["end_time"], 0)
+        task_view.append({"row": r, "hours": util.format_hours(minutes)})
 
     return render_template(
         "admin/entries.html",
-        entries=entries_view,
+        day_entries=day_view,
+        task_entries=task_view,
         employees=db.list_employees(dbc),
         selected_employee_id=employee_id,
         date_from=date_from,

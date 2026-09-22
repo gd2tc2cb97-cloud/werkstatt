@@ -5,11 +5,12 @@
 
 <div class="card">
   <table class="table">
-    <thead><tr><th>Titel</th><th>Mitarbeiter</th><th>Zeitraum</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Titel</th><th>Kennzeichen</th><th>Mitarbeiter</th><th>Zeitraum</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for t in tasks %}
       <tr>
         <td>{{ t.title }}</td>
+        <td>{{ t.license_plate or '' }}</td>
         <td>{{ t.employee_name or 'Alle' }}</td>
         <td>{{ t.start_date }} – {{ t.end_date }}</td>
         <td>{{ 'Erledigt' if t.status == 'erledigt' else 'Offen' }}</td>

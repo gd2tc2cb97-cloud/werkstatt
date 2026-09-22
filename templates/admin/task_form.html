@@ -9,6 +9,9 @@
     <label>Beschreibung
       <textarea name="description" rows="3">{{ task.description if task else '' }}</textarea>
     </label>
+    <label>Fahrzeugkennzeichen
+      <input type="text" name="license_plate" value="{{ task.license_plate if task else '' }}" placeholder="z. B. XX-YY 123">
+    </label>
     <label>Mitarbeiter
       <select name="employee_id">
         <option value="">– Alle Mitarbeiter –</option>

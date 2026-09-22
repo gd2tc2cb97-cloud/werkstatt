@@ -32,12 +32,13 @@
 </div>
 
 <div class="card">
+  <h2>Tagesarbeitszeiten</h2>
   <table class="table">
     <thead>
-      <tr><th>Datum</th><th>Mitarbeiter</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Stunden</th><th>Aufgabe</th><th>Notiz</th></tr>
+      <tr><th>Datum</th><th>Mitarbeiter</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Stunden</th></tr>
     </thead>
     <tbody>
-      {% for item in entries %}
+      {% for item in day_entries %}
       <tr>
         <td>{{ item.row.entry_date }}</td>
         <td>{{ item.row.employee_name }}</td>
@@ -45,13 +46,11 @@
         <td>{{ item.row.end_time }}</td>
         <td>{{ item.row.break_minutes }} min</td>
         <td>{{ item.hours }}</td>
-        <td>{{ item.row.task_title or '' }}</td>
-        <td>{{ item.row.notes }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  {% if not entries %}<p class="muted">Keine Einträge für diesen Filter.</p>{% endif %}
+  {% if not day_entries %}<p class="muted">Keine Tagesarbeitszeiten für diesen Filter.</p>{% endif %}
 
   <h2>Summe je Mitarbeiter</h2>
   <table class="table">
@@ -63,5 +62,29 @@
       <tr><td><strong>Gesamt</strong></td><td><strong>{{ total_hours }}</strong></td></tr>
     </tbody>
   </table>
+</div>
+
+<div class="card">
+  <h2>Aufgabenzeiten (Fahrzeug / Tätigkeit)</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Datum</th><th>Mitarbeiter</th><th>Beginn</th><th>Ende</th><th>Dauer</th><th>Aufgabe</th><th>Kennzeichen</th><th>Notiz</th></tr>
+    </thead>
+    <tbody>
+      {% for item in task_entries %}
+      <tr>
+        <td>{{ item.row.entry_date }}</td>
+        <td>{{ item.row.employee_name }}</td>
+        <td>{{ item.row.start_time }}</td>
+        <td>{{ item.row.end_time }}</td>
+        <td>{{ item.hours }}</td>
+        <td>{{ item.row.task_title or '– Sonstiges –' }}</td>
+        <td>{{ item.row.task_license_plate or '' }}</td>
+        <td>{{ item.row.notes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not task_entries %}<p class="muted">Keine Aufgabenzeiten für diesen Filter.</p>{% endif %}
 </div>
 {% endblock %}
